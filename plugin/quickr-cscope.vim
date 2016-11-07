@@ -83,7 +83,7 @@ endfunc
 " Unload_csdb
 "  drop cscope connections.
 function s:Unload_csdb()
-  if exists("b:csdbpath") && &ft != "qf" && &ft != "ctrlp"
+  if exists("b:csdbpath")
     if cscope_connection(3, "out", b:csdbpath)
       let save_csvb = &csverb
       set nocsverb
@@ -135,7 +135,7 @@ function! s:quickr_cscope(str, query)
     echohl Question
 
     " Mark this position
-    execute "normal mY"
+    mark Y
     " Close any open quickfix windows
     cclose
 
@@ -159,10 +159,10 @@ function! s:quickr_cscope(str, query)
         " If the buffer that cscope jumped to is not same as current file, close the buffer
         if l:cur_file_name != @%
             " Go back to where the command was issued
+            bd %
             execute "normal! `Y"
             " We just jumped back to where the command was issued from. So delete the previous
             " buffer, which will the the buffer quickfix jumped to
-            bd #
         endif
 
         " Open quickfix window
