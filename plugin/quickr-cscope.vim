@@ -132,6 +132,7 @@ augroup END
 
 " s:quickr_cscope {{
 function! s:quickr_cscope(str, query)
+    call s:Cycle_csdb()
     echohl Question
 
     " Mark this position
