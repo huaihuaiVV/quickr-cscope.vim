@@ -39,33 +39,92 @@ if !exists("g:quickr_cscope_prompt_length")
     let g:quickr_cscope_prompt_length = 3
 endif
 
-if !exists("g:quickr_cscope_program")
-    let g:quickr_cscope_program = "cscope"
-endif
-
-if !exists("g:quickr_cscope_db_file")
-    let g:quickr_cscope_db_file = "cscope.out"
-endif
-" }}
-
-" s:autoload_db {{
-function! s:autoload_db()
-    " Add any database in current directory or any parent
-    call s:debug_echo('Looking for the database file: ' . g:quickr_cscope_db_file)
-    let l:db = findfile(g:quickr_cscope_db_file, '.;')
-
-    if !empty(l:db)
-        call s:debug_echo('Database file found at: ' . l:db)
-        let &csprg=g:quickr_cscope_program
-        call s:debug_echo('Trying to add the database file for program: ' . g:quickr_cscope_program)
-        silent! execute "cs add " . l:db
-        return 1
-    else
-        call s:debug_echo('Database file not found.')
-        return 0
+"==
+" windowdir
+"  Gets the directory for the file in the current window
+"  Or the current working dir if there isn't one for the window.
+"  Use tr to allow that other OS paths, too
+function s:windowdir()
+  if winbufnr(0) == -1
+    let unislash = getcwd()
+  else 
+    let unislash = fnamemodify(bufname(winbufnr(0)), ':p:h')
+  endif
+    return tr(unislash, '\', '/')
+endfunc
+"
+"==
+" Find_in_parent
+" find the file argument and returns the path to it.
+" Starting with the current working dir, it walks up the parent folders
+" until it finds the file, or it hits the stop dir.
+" If it doesn't find it, it returns "Nothing"
+function s:Find_in_parent(fln,flsrt,flstp)
+  let here = a:flsrt
+  while ( strlen( here) > 0 )
+    if filereadable( here . "/" . a:fln )
+      return here
     endif
-endfunction
-" }}
+    let fr = match(here, "/[^/]*$")
+    if fr == -1
+      break
+    endif
+    let here = strpart(here, 0, fr)
+    if here == a:flstp
+      break
+    endif
+  endwhile
+  return "Nothing"
+endfunc
+" Unload_csdb
+"  drop cscope connections.
+function s:Unload_csdb()
+  if exists("b:csdbpath") && &ft!="qf"
+    if cscope_connection(3, "out", b:csdbpath)
+      let save_csvb = &csverb
+      set nocsverb
+      exe "cs kill " . b:csdbpath
+      set csverb
+      let &csverb = save_csvb
+    endif
+  endif
+endfunc
+"
+"==
+" Cycle_csdb
+"  cycle the loaded cscope db.
+function s:Cycle_csdb()
+    if exists("b:csdbpath")
+      if cscope_connection(3, "out", b:csdbpath)
+        return
+        "it is already loaded. don't try to reload it.
+      endif
+    endif
+    let newcsdbpath = s:Find_in_parent("cscope.out",s:windowdir(),$HOME)
+"    echo "Found cscope.out at: " . newcsdbpath
+"    echo "Windowdir: " . s:windowdir()
+    if newcsdbpath != "Nothing"
+      let b:csdbpath = newcsdbpath
+      if !cscope_connection(3, "out", b:csdbpath)
+        let save_csvb = &csverb
+        set nocsverb
+        exe "cs add " . b:csdbpath . "/cscope.out " . b:csdbpath
+        set csverb
+        let &csverb = save_csvb
+      endif
+      "
+    else " No cscope database, undo things. (someone rm-ed it or somesuch)
+      call s:Unload_csdb()
+    endif
+endfunc
+
+augroup autoload_cscope
+ au!
+ au BufEnter * call <SID>Cycle_csdb()
+ " au BufEnter *.cc      call <SID>Cycle_csdb() | call <SID>Cycle_macros_menus()
+ au BufUnload * call <SID>Unload_csdb()
+ " au BufUnload *.cc     call <SID>Unload_csdb() | call <SID>Cycle_macros_menus()
+augroup END
 
 " s:quickr_cscope {{
 function! s:quickr_cscope(str, query)
@@ -110,15 +169,10 @@ function! s:quickr_cscope(str, query)
             execute "normal /".l:search_term."\<CR>"
         endif
     endif
+    delmarks Y
     echohl None
 endfunction
 " }}
-
-if g:quickr_cscope_autoload_db
-    if s:autoload_db() == 0
-        finish
-    endif
-endif
 
 " s:get_visual_selection {{
 " http://stackoverflow.com/a/6271254/777247
@@ -148,23 +202,46 @@ nnoremap <silent> <plug>(quickr_cscope_text)          :call <SID>quickr_cscope(e
 vnoremap <silent> <plug>(quickr_cscope_text)          :call <SID>quickr_cscope(<SID>get_visual_selection(), "t")<CR>
 nnoremap <silent> <plug>(quickr_cscope_functions)     :call <SID>quickr_cscope(expand("<cword>"), "d")<CR>
 nnoremap <silent> <plug>(quickr_cscope_egrep)         :call <SID>quickr_cscope(input('Enter egrep pattern: '), "e")<CR>
+
+vnoremap <silent> <plug>(quickr_cscope_symbols)       :call <SID>quickr_cscope(<SID>get_visual_selection(), "s")<CR>
+vnoremap <silent> <plug>(quickr_cscope_callers)       :call <SID>quickr_cscope(<SID>get_visual_selection(), "c")<CR>
+vnoremap <silent> <plug>(quickr_cscope_files)         :call <SID>quickr_cscope(<SID>get_visual_selection(), "f")<CR>
+vnoremap <silent> <plug>(quickr_cscope_includes)      :call <SID>quickr_cscope(<SID>get_visual_selection(), "i")<CR>
+vnoremap <silent> <plug>(quickr_cscope_text)          :call <SID>quickr_cscope(<SID>get_visual_selection(), "t")<CR>
+vnoremap <silent> <plug>(quickr_cscope_text)          :call <SID>quickr_cscope(<SID>get_visual_selection(), "t")<CR>
+vnoremap <silent> <plug>(quickr_cscope_functions)     :call <SID>quickr_cscope(<SID>get_visual_selection(), "d")<CR>
+vnoremap <silent> <plug>(quickr_cscope_egrep)         :call <SID>quickr_cscope(<SID>get_visual_selection(), "e")<CR>
 " }}
 
 if g:quickr_cscope_keymaps
-    nmap <leader>g <plug>(quickr_cscope_global)
-    nmap <leader>s <plug>(quickr_cscope_symbols)
-    nmap <leader>c <plug>(quickr_cscope_callers)
-    nmap <leader>f <plug>(quickr_cscope_files)
-    nmap <leader>i <plug>(quickr_cscope_includes)
-    nmap <leader>t <plug>(quickr_cscope_text)
-    vmap <leader>t <plug>(quickr_cscope_text)
-    nmap <leader>d <plug>(quickr_cscope_functions)
-    nmap <leader>e <plug>(quickr_cscope_egrep)
+    nmap <C-\>g <plug>(quickr_cscope_global)
+    nmap <C-\>s <plug>(quickr_cscope_symbols)
+    nmap <C-\>c <plug>(quickr_cscope_callers)
+    nmap <C-\>f <plug>(quickr_cscope_files)
+    nmap <C-\>i <plug>(quickr_cscope_includes)
+    nmap <C-\>t <plug>(quickr_cscope_text)
+    nmap <C-\>d <plug>(quickr_cscope_functions)
+    nmap <C-\>e <plug>(quickr_cscope_egrep)
+
+    vmap <C-\>g <plug>(quickr_cscope_global)
+    vmap <C-\>s <plug>(quickr_cscope_symbols)
+    vmap <C-\>c <plug>(quickr_cscope_callers)
+    vmap <C-\>f <plug>(quickr_cscope_files)
+    vmap <C-\>i <plug>(quickr_cscope_includes)
+    vmap <C-\>t <plug>(quickr_cscope_text)
+    vmap <C-\>d <plug>(quickr_cscope_functions)
+    vmap <C-\>e <plug>(quickr_cscope_egrep)
 endif
 
 " Use quickfix window for cscope results. Clear previous results before the search.
 if g:quickr_cscope_use_qf_g
     set cscopequickfix=g-,s-,c-,f-,i-,t-,d-,e-
+    augroup autoload_cscope_qf
+        au!
+        autocmd! FileType qf nnoremap <buffer><silent> <C-v> <C-w><Enter><C-w>L
+        autocmd! FileType qf nnoremap <buffer><silent> <C-c> <C-w>q
+        autocmd! FileType qf nnoremap <buffer><silent> q <C-w>q
+    augroup END
 else
     set cscopequickfix=s-,c-,f-,i-,t-,d-,e-
 endif
