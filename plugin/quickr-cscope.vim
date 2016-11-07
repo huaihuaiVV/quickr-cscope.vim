@@ -35,6 +35,10 @@ if !exists("g:quickr_cscope_use_qf_g")
     let g:quickr_cscope_use_qf_g = 0
 endif
 
+if !exists("g:quickr_cscope_use_ctrlp_qf")
+    let g:quickr_cscope_use_ctrlp_qf = 0
+endif
+
 if !exists("g:quickr_cscope_prompt_length")
     let g:quickr_cscope_prompt_length = 3
 endif
@@ -79,7 +83,7 @@ endfunc
 " Unload_csdb
 "  drop cscope connections.
 function s:Unload_csdb()
-  if exists("b:csdbpath") && &ft!="qf"
+  if exists("b:csdbpath") && &ft != "qf" && &ft != "ctrlp"
     if cscope_connection(3, "out", b:csdbpath)
       let save_csvb = &csverb
       set nocsverb
@@ -151,7 +155,7 @@ function! s:quickr_cscope(str, query)
 
     let l:n_results = len(getqflist())
     echon ". Search returned ". l:n_results . " results."
-    if l:n_results > 1
+    if l:n_results > 0
         " If the buffer that cscope jumped to is not same as current file, close the buffer
         if l:cur_file_name != @%
             " Go back to where the command was issued
@@ -162,12 +166,16 @@ function! s:quickr_cscope(str, query)
         endif
 
         " Open quickfix window
-        botright cwindow
-
-        " Search for the query string for easy navigation using n and N in quickfix
-        if a:query != "f"
-            execute "normal /".l:search_term."\<CR>"
+        if g:quickr_cscope_use_ctrlp_qf
+            CtrlPQuickfix
+        else
+            botright cwindow
+            " Search for the query string for easy navigation using n and N in quickfix
+            if a:query != "f"
+                execute "normal /".l:search_term."\<CR>"
+            endif
         endif
+
     endif
     delmarks Y
     echohl None
@@ -236,12 +244,12 @@ endif
 " Use quickfix window for cscope results. Clear previous results before the search.
 if g:quickr_cscope_use_qf_g
     set cscopequickfix=g-,s-,c-,f-,i-,t-,d-,e-
-    augroup autoload_cscope_qf
-        au!
-        autocmd! FileType qf nnoremap <buffer><silent> <C-v> <C-w><Enter><C-w>L
-        autocmd! FileType qf nnoremap <buffer><silent> <C-c> <C-w>q
-        autocmd! FileType qf nnoremap <buffer><silent> q <C-w>q
-    augroup END
+    if g:quickr_cscope_use_ctrlp_qf == 0
+        augroup autoload_cscope_qf
+            au!
+            autocmd! FileType qf nnoremap <buffer><silent> q <C-w>q
+        augroup END
+    endif
 else
     set cscopequickfix=s-,c-,f-,i-,t-,d-,e-
 endif
