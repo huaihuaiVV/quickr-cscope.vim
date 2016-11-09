@@ -152,7 +152,7 @@ function! s:quickr_cscope(str, query)
 
     let l:cur_file_name=@%
     echon "Searching for: ".l:search_term
-    silent! execute "cs find ".a:query." ".l:search_term
+    silent! keepjumps execute "cs find ".a:query." ".l:search_term
 
     let l:n_results = len(getqflist())
     echon ". Search returned ". l:n_results . " results."
