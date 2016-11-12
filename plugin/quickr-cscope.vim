@@ -149,7 +149,7 @@ function! s:quickr_cscope(str, query)
     call setqflist([])
 
     let l:cur_file_name=@%
-    let l:save_cursor = getcurpos()
+    let l:save_cursor = getpos(".")
     echon "Searching for: ".l:search_term
     silent! keepjumps execute "cs find ".a:query." ".l:search_term
 
