@@ -135,8 +135,6 @@ function! s:quickr_cscope(str, query)
     call s:Cycle_csdb()
     echohl Question
 
-    " Mark this position
-    mark Y
     " Close any open quickfix windows
     cclose
 
@@ -151,6 +149,7 @@ function! s:quickr_cscope(str, query)
     call setqflist([])
 
     let l:cur_file_name=@%
+    let l:save_cursor = getcurpos()
     echon "Searching for: ".l:search_term
     silent! keepjumps execute "cs find ".a:query." ".l:search_term
 
@@ -159,12 +158,9 @@ function! s:quickr_cscope(str, query)
     if l:n_results > 0
         " If the buffer that cscope jumped to is not same as current file, close the buffer
         if l:cur_file_name != @%
-            " Go back to where the command was issued
-            bd %
-            execute "normal! `Y"
-            " We just jumped back to where the command was issued from. So delete the previous
-            " buffer, which will the the buffer quickfix jumped to
+            buffer #
         endif
+        call setpos('.', l:save_cursor)
 
         " Open quickfix window
         if g:quickr_cscope_use_ctrlp_qf
@@ -178,7 +174,6 @@ function! s:quickr_cscope(str, query)
         endif
 
     endif
-    delmarks Y
     echohl None
 endfunction
 " }}
