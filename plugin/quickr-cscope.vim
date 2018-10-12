@@ -244,6 +244,7 @@ if g:quickr_cscope_use_qf_g
         augroup autoload_cscope_qf
             au!
             autocmd! FileType qf nnoremap <buffer><silent> q <C-w>q
+            autocmd! FileType qf nnoremap <buffer><silent> <C-c> <C-w>q
         augroup END
     endif
 else
